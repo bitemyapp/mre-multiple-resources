@@ -50,6 +50,7 @@ pub fn App() -> impl IntoView {
                 <Routes>
                     <Route path="" view=HomePage/>
                     <Route path="/correct" view=HomePageCorrect/>
+                    <Route path="/workaround" view=HomePageCorrect/>
                     <Route path="/*any" view=NotFound/>
                 </Routes>
             </main>
@@ -79,6 +80,43 @@ fn HomePage() -> impl IntoView {
                         view!{ <OtherComponent one=one two=two/> }
                     }
                 }
+            }}
+        </Transition>
+    }
+}
+
+#[component]
+fn HomePageWorkaround() -> impl IntoView {
+    let signal_one = create_rw_signal(1);
+    let QueryResult {
+        data: one_second, ..
+    } = first_wait_fn_query().use_query(move || FirstWaitFnQuery(signal_one.get()));
+    let signal_two = create_rw_signal(2);
+    let QueryResult {
+        data: two_second, ..
+    } = first_wait_fn_query().use_query(move || FirstWaitFnQuery(signal_two.get()));
+    view! {
+        <Transition fallback= move || view!{"loading..."}>
+            {move || {
+                let one = one_second.get();
+                if one.is_none() {
+                    return view!{<p>"loading..."</p>}.into_view();
+                }
+                let one = one.unwrap();
+                if one.is_err() {
+                    return view!{<p>"error"</p>}.into_view();
+                }
+                let one = one.unwrap();
+                let two = two_second.get();
+                if two.is_none() {
+                    return view!{<p>"loading..."</p>}.into_view();
+                }
+                let two = two.unwrap();
+                if two.is_err() {
+                    return view!{<p>"error"</p>}.into_view();
+                }
+                let two = two.unwrap();
+                view!{ <OtherComponent one=one two=two/> }
             }}
         </Transition>
     }
