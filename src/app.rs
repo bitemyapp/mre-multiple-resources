@@ -50,7 +50,7 @@ pub fn App() -> impl IntoView {
                 <Routes>
                     <Route path="" view=HomePage/>
                     <Route path="/correct" view=HomePageCorrect/>
-                    <Route path="/workaround" view=HomePageCorrect/>
+                    <Route path="/workaround" view=HomePageWorkaround/>
                     <Route path="/*any" view=NotFound/>
                 </Routes>
             </main>
@@ -98,6 +98,7 @@ fn HomePageWorkaround() -> impl IntoView {
     view! {
         <Transition fallback= move || view!{"loading..."}>
             {move || {
+                tracing::info!("rendering one and two");
                 let one = one_second.get();
                 if one.is_none() {
                     return view!{<p>"loading..."</p>}.into_view();
