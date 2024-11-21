@@ -26,6 +26,7 @@ pub fn App() -> impl IntoView {
             <main>
                 <Routes>
                     <Route path="/" view=HomePageRepro/>
+                    <Route path="/panic" view=HomePageReproPanic/>
                     <Route path="/correct" view=HomePageCorrect/>
                     <Route path="/*any" view=NotFound/>
                 </Routes>
@@ -72,6 +73,49 @@ fn HomePageRepro() -> impl IntoView {
 
 /// Renders the home page of your application.
 #[component]
+fn HomePageReproPanic() -> impl IntoView {
+    let fast = create_resource(|| (), |_| wait_fn(50));
+    let slow = create_resource(|| (), |_| wait_fn(1000));
+
+    view! {
+        <Transition fallback= move || view!{"loading..."}>
+            {move || {
+                let loading_view = view!{<p>"loading..."</p>}.into_view();
+                let error_view = view!{<p>"Error!"</p>}.into_view();
+                let fast_signal = create_rw_signal(0);
+                let slow_signal = create_rw_signal(0);
+                let fast = fast.get();
+                if fast.is_none() {
+                    return loading_view;
+                }
+                let fast = fast.unwrap();
+                if fast.is_err() {
+                    return error_view;
+                }
+                let fast = fast.unwrap();
+                fast_signal.set(fast);
+                let slow = slow.get();
+                if slow.is_none() {
+                    return loading_view;
+                }
+                let slow = slow.unwrap();
+                if slow.is_err() {
+                    return error_view;
+                }
+                let slow = slow.unwrap();
+                slow_signal.set(slow);
+                tracing::info!("rendering one and two");
+                view! {
+                    <OtherComponent one=fast two=slow/>
+                    <SignaledComponent fast=fast_signal slow=slow_signal/>
+                }.into_view()
+            }}
+        </Transition>
+    }
+}
+
+/// Renders the home page of your application.
+#[component]
 fn HomePageCorrect() -> impl IntoView {
     let fast = create_resource(|| (), |_| wait_fn(50));
     let slow = create_resource(|| (), |_| wait_fn(1000));
@@ -93,8 +137,37 @@ fn HomePageCorrect() -> impl IntoView {
 }
 
 #[component]
+pub fn SignaledComponent(fast: RwSignal<u64>, slow: RwSignal<u64>) -> impl IntoView {
+    view! {
+        <ul>
+            <li>
+                <a href="/">Home repro (no panic)</a>
+            </li>
+            <li>
+                <a href="/panic">Home repro (attempting panic)</a>
+            </li>
+            <li>
+                <a href="/correct">Home correct (no panic, no issues)</a>
+            </li>
+        </ul>
+        <p>{move || fast.get()}{move || slow.get()}</p>
+    }
+}
+
+#[component]
 pub fn OtherComponent(one: u64, two: u64) -> impl IntoView {
     view! {
+        <ul>
+            <li>
+                <a href="/">Home repro (no panic)</a>
+            </li>
+            <li>
+                <a href="/panic">Home repro (attempting panic)</a>
+            </li>
+            <li>
+                <a href="/correct">Home correct (no panic, no issues)</a>
+            </li>
+        </ul>
         <p>{one}{two}</p>
     }
 }
