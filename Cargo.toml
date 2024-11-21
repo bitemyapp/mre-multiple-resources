@@ -19,7 +19,7 @@ leptos_query = { version = "0.5", features = ["indexed_db"] }
 serde = "1.0"
 tokio = { version = "1.40", features = ["time", "rt"], optional = true }
 tracing-wasm = { version = "0.2", optional = true }
-wasm-bindgen = "=0.2.93"
+wasm-bindgen = "=0.2.95"
 
 [features]
 csr = ["leptos/csr", "leptos_meta/csr", "leptos_router/csr"]
@@ -65,7 +65,7 @@ style-file = "style/main.scss"
 # Optional. Env: LEPTOS_ASSETS_DIR.
 assets-dir = "assets"
 # The IP and port (ex: 127.0.0.1:3000) where the server serves the content. Use it in your server setup.
-site-addr = "127.0.0.1:3000"
+site-addr = "127.0.0.1:8080"
 # The port to use for automatic reload monitoring
 reload-port = 3001
 # [Optional] Command to use when running end2end tests. It will run in the end2end dir.

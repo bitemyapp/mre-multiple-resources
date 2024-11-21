@@ -1,40 +1,17 @@
 use leptos::*;
 use leptos_meta::*;
-use leptos_query::{
-    create_query, provide_query_client_with_options_and_persister,
-    query_persister, QueryOptions, QueryResult, QueryScope,
-};
 use leptos_router::*;
-use serde::Deserialize;
-use serde::Serialize;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct FirstWaitFnQuery(pub u64);
-
-pub fn first_wait_fn_query() -> QueryScope<FirstWaitFnQuery, Result<u64, ServerFnError>> {
-    create_query(first_wait_fn, QueryOptions::default())
-}
-
-#[server(FirstWaitFn, "/api")]
-async fn first_wait_fn(seconds: FirstWaitFnQuery) -> Result<u64, ServerFnError> {
-    tokio::time::sleep(tokio::time::Duration::from_secs(seconds.0)).await;
-    Ok(seconds.0)
-}
-
-#[server]
-async fn second_wait_fn(seconds: u64) -> Result<u64, ServerFnError> {
-    tokio::time::sleep(tokio::time::Duration::from_secs(seconds)).await;
-    Ok(seconds)
+#[server(WaitFn)]
+async fn wait_fn(milliseconds: u64) -> Result<u64, ServerFnError> {
+    tokio::time::sleep(tokio::time::Duration::from_millis(milliseconds)).await;
+    Ok(milliseconds)
 }
 
 #[component]
 pub fn App() -> impl IntoView {
     // Provides context that manages stylesheets, titles, meta tags, etc.
     provide_meta_context();
-    provide_query_client_with_options_and_persister(
-        Default::default(),
-        query_persister::IndexedDbPersister::default(),
-    );
 
     view! {
         // injects a stylesheet into the document <head>
@@ -48,9 +25,8 @@ pub fn App() -> impl IntoView {
         <Router>
             <main>
                 <Routes>
-                    <Route path="" view=HomePage/>
+                    <Route path="/" view=HomePageRepro/>
                     <Route path="/correct" view=HomePageCorrect/>
-                    <Route path="/workaround" view=HomePageWorkaround/>
                     <Route path="/*any" view=NotFound/>
                 </Routes>
             </main>
@@ -60,87 +36,52 @@ pub fn App() -> impl IntoView {
 
 /// Renders the home page of your application.
 #[component]
-fn HomePage() -> impl IntoView {
-    let signal_one = create_rw_signal(1);
-    let QueryResult {
-        data: one_second, ..
-    } = first_wait_fn_query().use_query(move || FirstWaitFnQuery(signal_one.get()));
-    let signal_two = create_rw_signal(2);
-    let QueryResult {
-        data: two_second, ..
-    } = first_wait_fn_query().use_query(move || FirstWaitFnQuery(signal_two.get()));
-    view! {
-        <Transition fallback= move || view!{"loading..."}>
-            {move || {
-                match (one_second.get(), two_second.get()) {
-                    (None, _) | (_, None) => view!{<p>"loading..."</p>}.into_view(),
-                    (Some(Err(_)), _) | (_, Some(Err(_)))  => view!{<p>"error"</p>}.into_view(),
-                    (Some(Ok(one)), Some(Ok(two))) => {
-                        tracing::info!("rendering one and two");
-                        view!{ <OtherComponent one=one two=two/> }
-                    }
-                }
-            }}
-        </Transition>
-    }
-}
+fn HomePageRepro() -> impl IntoView {
+    let fast = create_resource(|| (), |_| wait_fn(50));
+    let slow = create_resource(|| (), |_| wait_fn(1000));
 
-#[component]
-fn HomePageWorkaround() -> impl IntoView {
-    let signal_one = create_rw_signal(1);
-    let QueryResult {
-        data: one_second, ..
-    } = first_wait_fn_query().use_query(move || FirstWaitFnQuery(signal_one.get()));
-    let signal_two = create_rw_signal(2);
-    let QueryResult {
-        data: two_second, ..
-    } = first_wait_fn_query().use_query(move || FirstWaitFnQuery(signal_two.get()));
     view! {
         <Transition fallback= move || view!{"loading..."}>
             {move || {
+                let loading_view = view!{<p>"loading..."</p>}.into_view();
+                let error_view = view!{<p>"Error!"</p>}.into_view();
+                let fast = fast.get();
+                if fast.is_none() {
+                    return loading_view;
+                }
+                let fast = fast.unwrap();
+                if fast.is_err() {
+                    return error_view;
+                }
+                let fast = fast.unwrap();
+                let slow = slow.get();
+                if slow.is_none() {
+                    return loading_view;
+                }
+                let slow = slow.unwrap();
+                if slow.is_err() {
+                    return error_view;
+                }
+                let slow = slow.unwrap();
                 tracing::info!("rendering one and two");
-                let one = one_second.get();
-                if one.is_none() {
-                    return view!{<p>"loading..."</p>}.into_view();
-                }
-                let one = one.unwrap();
-                if one.is_err() {
-                    return view!{<p>"error"</p>}.into_view();
-                }
-                let one = one.unwrap();
-                let two = two_second.get();
-                if two.is_none() {
-                    return view!{<p>"loading..."</p>}.into_view();
-                }
-                let two = two.unwrap();
-                if two.is_err() {
-                    return view!{<p>"error"</p>}.into_view();
-                }
-                let two = two.unwrap();
-                view!{ <OtherComponent one=one two=two/> }
+                view!{ <OtherComponent one=fast two=slow/> }
             }}
         </Transition>
     }
 }
 
+/// Renders the home page of your application.
 #[component]
 fn HomePageCorrect() -> impl IntoView {
-    let signal_one = create_rw_signal(1);
-    let signal_two = create_rw_signal(2);
-    let one_second = create_resource(
-        move || signal_one,
-        move |seconds| second_wait_fn(seconds.get()),
-    );
-    let two_second = create_resource(
-        move || signal_two,
-        move |seconds| second_wait_fn(seconds.get()),
-    );
+    let fast = create_resource(|| (), |_| wait_fn(50));
+    let slow = create_resource(|| (), |_| wait_fn(1000));
+
     view! {
         <Transition fallback= move || view!{"loading..."}>
             {move || {
-                match (one_second.get(), two_second.get()) {
+                match (fast.get(), slow.get()) {
                     (None, _) | (_, None) => view!{<p>"loading..."</p>}.into_view(),
-                    (Some(Err(_)), _) | (_, Some(Err(_))) => view!{<p>"error"</p>}.into_view(),
+                    (Some(Err(_)), _) | (_, Some(Err(_)))  => view!{<p>"error"</p>}.into_view(),
                     (Some(Ok(one)), Some(Ok(two))) => {
                         tracing::info!("rendering one and two");
                         view!{ <OtherComponent one=one two=two/> }
